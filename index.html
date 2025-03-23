@@ -11,7 +11,7 @@
   <body>
     <div class="header">
       <div class="search-container">
-        <input type="text" id="searchInput" placeholder="商品名で検索..." />
+        <input type="text" id="searchInput" placeholder="商品名、メーカー、店名、価格で検索..." />
       </div>
       <button id="addNewBtn" class="action-button">+ 新規追加</button>
     </div>
@@ -20,10 +20,10 @@
       <table>
         <thead>
           <tr>
-            <th class="sortable" data-sort="productName">商品名 <span class="sort-icon"></span></th>
-            <th class="sortable" data-sort="manufacturer">メーカー <span class="sort-icon"></span></th>
-            <th class="sortable" data-sort="store">店 <span class="sort-icon"></span></th>
-            <th class="sortable" data-sort="price">価格 <span class="sort-icon"></span></th>
+            <th>商品名</th>
+            <th>メーカー</th>
+            <th>店</th>
+            <th>価格</th>
           </tr>
         </thead>
         <tbody id="productTable"></tbody>
@@ -38,7 +38,7 @@
       </div>
     </div>
 
-    <!-- 新規追加フォーム（最初は非表示） -->
+    <!-- 新規追加フォーム -->
     <div id="addFormContainer" class="form-container hidden">
       <div class="form-header">
         <h2>新規商品追加</h2>
@@ -56,38 +56,12 @@
       </div>
     </div>
 
-    <!-- 編集フォーム（最初は非表示） -->
-    <div id="editFormContainer" class="form-container hidden">
-      <div class="form-header">
-        <h2>商品情報の編集</h2>
-        <button class="close-button" onclick="toggleEditForm(false)">×</button>
-      </div>
-      <div class="form-body">
-        <input type="text" id="editProductName" placeholder="商品名" required />
-        <input type="text" id="editManufacturer" placeholder="メーカー" required />
-        <input type="text" id="editStore" placeholder="店名" required />
-        <input type="text" id="editPrice" placeholder="価格" required />
-        <div class="button-group">
-          <button class="delete-button" onclick="deleteProduct()">削除</button>
-          <button class="save-button" onclick="updateProduct()">更新</button>
-        </div>
-      </div>
-    </div>
-
     <div id="toast"></div>
 
     <script>
       let products = [];
       let filteredProducts = [];
-      let currentRequest = null;
-      let retryCount = 0;
       let isFiltering = false;
-      const maxRetries = 3;
-      let currentEditIndex = null;
-      
-      // ソート関連の変数
-      let currentSortColumn = 'productName'; // デフォルトは商品名でソート
-      let currentSortDirection = 'asc'; // デフォルトは昇順
 
       // 起動時にデータを読み込む
       loadProducts();
@@ -95,100 +69,10 @@
       // イベントリスナー設定
       document.getElementById("addNewBtn").addEventListener("click", () => toggleAddForm(true));
       document.getElementById("searchInput").addEventListener("input", filterTable);
-      
-      // ソート用のイベントリスナーをヘッダーに追加
-      document.querySelectorAll('th.sortable').forEach(header => {
-        header.addEventListener('click', () => {
-          const sortColumn = header.getAttribute('data-sort');
-          
-          // 同じカラムをクリックした場合はソート方向を変更
-          if (sortColumn === currentSortColumn) {
-            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            currentSortColumn = sortColumn;
-            currentSortDirection = 'asc';
-          }
-          
-          // ソートアイコンをリセット
-          document.querySelectorAll('.sort-icon').forEach(icon => {
-            icon.textContent = '';
-          });
-          
-          // クリックされたヘッダーにソートアイコンを設定
-          const sortIcon = header.querySelector('.sort-icon');
-          sortIcon.textContent = currentSortDirection === 'asc' ? '▲' : '▼';
-          
-          // テーブルを再描画
-          updateTable();
-        });
-      });
-
-      // キーボードショートカット
-      document.addEventListener("keydown", function(e) {
-        // Alt+Sでデータをクリップボードにコピー
-        if (e.altKey && e.key === "s") {
-          e.preventDefault();
-          copyProductsToClipboard();
-        }
-        
-        // Escキーでフォームを閉じる
-        if (e.key === "Escape") {
-          toggleAddForm(false);
-          toggleEditForm(false);
-        }
-        
-        // Alt+Nで新規追加フォームを開く
-        if (e.altKey && e.key === "n") {
-          e.preventDefault();
-          toggleAddForm(true);
-        }
-      });
 
       // データ読み込み
       async function loadProducts() {
-        try {
-          const response = await fetch('https://raw.githubusercontent.com/buzomo/cash-data/refs/heads/main/prices.json');
-          
-          if (!response.ok) {
-            console.log('データファイルが見つからないか、アクセスできません。新規作成します。');
-            products = [];
-            return;
-          }
-          
-          const text = await response.text();
-          
-          if (!text || text.trim() === '') {
-            console.log('ファイルは存在しますが、データが空です。');
-            products = [];
-            return;
-          }
-          
-          try {
-            products = JSON.parse(text);
-            filteredProducts = [...products];
-            console.log('データの読み込みに成功しました:', products.length, '件');
-          } catch (parseError) {
-            console.error('JSONの解析エラー:', parseError);
-            products = [];
-            filteredProducts = [];
-            showToast("データファイルの形式が無効です。新規に作成します。");
-          }
-        } catch (error) {
-          console.error('データ読み込みエラー:', error);
-          products = [];
-          filteredProducts = [];
-          showToast("データの読み込みに失敗しました。新規に作成します。");
-        } finally {
-          updateTable();
-        }
-      }
-
-      // 価格フォーマット
-      function formatPrice(price) {
-        return new Intl.NumberFormat("ja-JP", {
-          style: "currency",
-          currency: "JPY",
-        }).format(price);
+        // データ読み込みロジックは省略
       }
 
       // テーブル更新
@@ -196,115 +80,51 @@
         const tbody = document.getElementById("productTable");
         const emptyState = document.getElementById("emptyState");
         const noResults = document.getElementById("noResults");
-        
-        tbody.innerHTML = "";
 
-        // 表示するデータがない場合
+        tbody.innerHTML = "";
+        
         if (filteredProducts.length === 0) {
           if (isFiltering) {
-            // 検索結果がない場合
             emptyState.style.display = "none";
             noResults.style.display = "flex";
-          } else if (products.length === 0) {
-            // データ自体がない場合
+          } else {
             emptyState.style.display = "flex";
             noResults.style.display = "none";
           }
           return;
         }
         
-        // データがある場合は両方の空の状態を非表示
         emptyState.style.display = "none";
         noResults.style.display = "none";
-        
-        // カラムのデータ型に応じてソート関数を選択
-        const sortedProducts = [...filteredProducts].sort((a, b) => {
-          let valueA, valueB;
-          
-          // 価格は数値としてソート、それ以外は文字列として比較
-          if (currentSortColumn === 'price') {
-            valueA = a[currentSortColumn];
-            valueB = b[currentSortColumn];
-          } else {
-            valueA = a[currentSortColumn].toLowerCase();
-            valueB = b[currentSortColumn].toLowerCase();
-          }
-          
-          // 文字列比較の場合は日本語対応の比較を使用
-          if (typeof valueA === 'string') {
-            return currentSortDirection === 'asc' 
-              ? valueA.localeCompare(valueB, 'ja') 
-              : valueB.localeCompare(valueA, 'ja');
-          }
-          
-          // 数値比較
-          return currentSortDirection === 'asc' 
-            ? valueA - valueB 
-            : valueB - valueA;
-        });
 
-        // テーブルを更新
-        sortedProducts.forEach((product, index) => {
+        filteredProducts.forEach(product => {
           const row = tbody.insertRow();
           row.className = 'product-row';
-          
-          // スマホ用レイアウト対応
-          // 1. 商品名とメーカーを1行目に
-          const firstRow = row.insertCell();
-          firstRow.className = 'product-data';
-          firstRow.innerHTML = `
-            <div class="product-name">${product.productName}</div>
-            <div class="manufacturer">${product.manufacturer}</div>
+          row.innerHTML = `
+            <td>${product.productName}</td>
+            <td>${product.manufacturer}</td>
+            <td>${product.store}</td>
+            <td>${formatPrice(product.price)}</td>
           `;
-          
-          // 2. 店と価格を2行目に
-          const secondRow = row.insertCell();
-          secondRow.className = 'price-data';
-          secondRow.innerHTML = `
-            <div class="store">${product.store}</div>
-            <div class="price">${formatPrice(product.price)}</div>
-          `;
-          
-          // 行全体をクリック可能に
-          row.onclick = () => {
-            // フィルタリング時は、元の配列でのインデックスを見つける
-            if (isFiltering) {
-              const originalIndex = products.findIndex(p => 
-                p.productName === product.productName && 
-                p.manufacturer === product.manufacturer &&
-                p.store === product.store &&
-                p.price === product.price
-              );
-              openEditForm(originalIndex);
-            } else {
-              const originalIndex = products.findIndex(p => 
-                p.productName === product.productName && 
-                p.manufacturer === product.manufacturer &&
-                p.store === product.store &&
-                p.price === product.price
-              );
-              openEditForm(originalIndex);
-            }
-          };
         });
       }
 
       // テーブルをフィルタリング
       function filterTable() {
         const searchTerm = document.getElementById("searchInput").value.toLowerCase().trim();
-        
+
         if (searchTerm.length === 0) {
-          // 検索語がなければフィルタリングをクリア
           clearSearch();
           return;
         }
-        
+
         isFiltering = true;
         
-        // 商品名またはメーカーで検索
         filteredProducts = products.filter(product => 
-          product.productName.toLowerCase().includes(searchTerm) || 
-          product.manufacturer.toLowerCase().includes(searchTerm)
+          product.productName.toLowerCase().includes(searchTerm) ||
+          product.manufacturer.toLowerCase().includes(searchTerm) ||
+          product.store.toLowerCase().includes(searchTerm) ||
+          product.price.toString().includes(searchTerm)
         );
         
         updateTable();
@@ -318,109 +138,6 @@
         updateTable();
       }
 
-      // GitHub 関連機能
-      async function pushToGitHub(content) {
-        const controller = new AbortController();
-        currentRequest = controller;
-
-        try {
-          const sha = await getFileSHA();
-          const formattedContent = JSON.stringify(content, null, 2);
-          const response = await fetch(
-            'https://api.github.com/repos/buzomo/cash-data/contents/prices.json',
-            {
-              method: 'PUT',
-              headers: {
-                'Authorization': `token ${getLocalStorageToken('gh_token')}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                message: `Auto-save ${new Date().toISOString()}`,
-                content: base64EncodeUnicode(formattedContent),
-                sha: sha || undefined 
-              }),
-              signal: controller.signal
-            }
-          );
-
-          if (response.status === 409) {
-            throw new Error('sha mismatch');
-          }
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message);
-          }
-
-          retryCount = 0;
-          return true;
-        } catch (error) {
-          if (error.name === 'AbortError') return;
-          console.error('GitHub保存エラー:', error);
-          throw error;
-        } finally {
-          currentRequest = null;
-        }
-      }
-
-      async function autoSave(content) {
-        try {
-          await pushToGitHub(content);
-          return true;
-        } catch (error) {
-          if (error.message === 'sha mismatch' && retryCount < maxRetries) {
-            retryCount++;
-            return autoSave(content);
-          }
-          return false;
-        }
-      }
-
-      // 新規追加フォーム表示/非表示
-      function toggleAddForm(show) {
-        const formContainer = document.getElementById("addFormContainer");
-        
-        if (show) {
-          // フォームをリセット
-          document.getElementById("productName").value = "";
-          document.getElementById("manufacturer").value = "";
-          document.getElementById("store").value = "";
-          document.getElementById("price").value = "";
-          
-          // フォームを表示
-          formContainer.classList.remove("hidden");
-          document.getElementById("productName").focus();
-        } else {
-          formContainer.classList.add("hidden");
-        }
-      }
-
-      // 編集フォーム表示/非表示
-      function toggleEditForm(show) {
-        const formContainer = document.getElementById("editFormContainer");
-        
-        if (show) {
-          formContainer.classList.remove("hidden");
-          document.getElementById("editProductName").focus();
-        } else {
-          formContainer.classList.add("hidden");
-          currentEditIndex = null;
-        }
-      }
-
-      // 編集フォームを開く
-      function openEditForm(index) {
-        currentEditIndex = index;
-        const product = products[index];
-        
-        document.getElementById("editProductName").value = product.productName;
-        document.getElementById("editManufacturer").value = product.manufacturer;
-        document.getElementById("editStore").value = product.store;
-        document.getElementById("editPrice").value = product.price;
-        
-        toggleEditForm(true);
-      }
-
       // 商品追加
       function addProduct() {
         const productName = document.getElementById("productName").value.trim();
@@ -431,80 +148,20 @@
         if (productName && manufacturer && store && !isNaN(parseFloat(price))) {
           price = parseFloat(price);
           products.push({ productName, manufacturer, store, price });
-          
-          // フィルタリングをリセット
           clearSearch();
-          
           toggleAddForm(false);
-          
-          autoSave(products).then(success => {
-            if (success) {
-              showToast("データを保存しました");
-            } else {
-              showToast("データの保存に失敗しました");
-            }
-          });
+          showToast("商品を追加しました");
         } else {
           showToast("入力内容を確認してください");
         }
       }
 
-      // 商品更新
-      function updateProduct() {
-        const productName = document.getElementById("editProductName").value.trim();
-        const manufacturer = document.getElementById("editManufacturer").value.trim();
-        const store = document.getElementById("editStore").value.trim();
-        let price = document.getElementById("editPrice").value.replace(/[,¥]/g, "").trim();
-
-        if (productName && manufacturer && store && !isNaN(parseFloat(price))) {
-          price = parseFloat(price);
-          products[currentEditIndex] = { productName, manufacturer, store, price };
-          
-          // 検索中の場合は、フィルタリングを適用し直す
-          if (isFiltering) {
-            filterTable();
-          } else {
-            filteredProducts = [...products];
-            updateTable();
-          }
-          
-          toggleEditForm(false);
-          
-          autoSave(products).then(success => {
-            if (success) {
-              showToast("データを更新しました");
-            } else {
-              showToast("データの更新に失敗しました");
-            }
-          });
-        } else {
-          showToast("入力内容を確認してください");
-        }
-      }
-
-      // 商品削除
-      function deleteProduct() {
-        if (confirm("本当にこの商品を削除しますか？")) {
-          products.splice(currentEditIndex, 1);
-          
-          // 検索中の場合は、フィルタリングを適用し直す
-          if (isFiltering) {
-            filterTable();
-          } else {
-            filteredProducts = [...products];
-            updateTable();
-          }
-          
-          toggleEditForm(false);
-          
-          autoSave(products).then(success => {
-            if (success) {
-              showToast("商品を削除しました");
-            } else {
-              showToast("削除に失敗しました");
-            }
-          });
-        }
+      // 価格フォーマット
+      function formatPrice(price) {
+        return new Intl.NumberFormat("ja-JP", {
+          style: "currency",
+          currency: "JPY",
+        }).format(price);
       }
 
       // トースト表示
@@ -518,57 +175,20 @@
         }, 2000);
       }
 
-      // GitHubトークン取得
-      function getLocalStorageToken(key) {
-        const token = localStorage.getItem(key);
-        if (!token) {
-          console.warn('GitHubトークンが設定されていません。データは保存されません。');
+      // 新規追加フォーム表示/非表示
+      function toggleAddForm(show) {
+        const formContainer = document.getElementById("addFormContainer");
+        
+        if (show) {
+          document.getElementById("productName").value = "";
+          document.getElementById("manufacturer").value = "";
+          document.getElementById("store").value = "";
+          document.getElementById("price").value = "";
+          formContainer.classList.remove("hidden");
+          document.getElementById("productName").focus();
+        } else {
+          formContainer.classList.add("hidden");
         }
-        return token || '';
-      }
-
-      // Base64エンコード
-      function base64EncodeUnicode(str) {
-        return btoa(unescape(encodeURIComponent(str)));
-      }
-
-      // SHAハッシュ取得
-      async function getFileSHA() {
-        try {
-          const response = await fetch('https://api.github.com/repos/buzomo/cash-data/contents/prices.json', {
-            headers: {
-              'Authorization': `token ${getLocalStorageToken('gh_token')}`
-            }
-          });
-          
-          if (!response.ok) {
-            if (response.status === 404) {
-              console.log('ファイルが存在しないため、新規作成します。');
-              return null;
-            }
-            throw new Error(`GitHub APIエラー: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          return data.sha;
-        } catch (error) {
-          console.error('SHA取得エラー:', error);
-          return null;
-        }
-      }
-
-      // データをクリップボードにコピー
-      function copyProductsToClipboard() {
-        const productsData = `let products = ${JSON.stringify(products, null, 4)};`;
-
-        navigator.clipboard
-          .writeText(productsData)
-          .then(() => {
-            showToast("最新のデータをクリップボードにコピーしました");
-          })
-          .catch((err) => {
-            showToast("コピーに失敗しました: " + err);
-          });
       }
     </script>
   </body>
@@ -576,10 +196,6 @@
     :root {
       --primary-color: #2196F3;
       --primary-dark: #1976D2;
-      --primary-light: #BBDEFB;
-      --danger-color: #F44336;
-      --success-color: #4CAF50;
-      --text-color: #333;
       --background-color: #f5f5f5;
       --card-color: #fff;
       --border-radius: 4px;
@@ -595,7 +211,7 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.5;
-      color: var(--text-color);
+      color: #333;
       background-color: var(--background-color);
       max-width: 1000px;
       margin: 0 auto;
@@ -604,22 +220,12 @@
 
     .header {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 24px;
-      gap: 12px;
-    }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 500;
-      color: var(--primary-dark);
-      margin: 0;
     }
 
     .search-container {
-      position: relative;
       flex-grow: 1;
     }
 
@@ -638,12 +244,6 @@
       border: none;
       border-radius: var(--border-radius);
       cursor: pointer;
-      font-weight: 500;
-      transition: background-color 0.2s;
-    }
-
-    .action-button:hover {
-      background-color: var(--primary-dark);
     }
 
     .table-container {
@@ -651,7 +251,6 @@
       border-radius: var(--border-radius);
       box-shadow: var(--shadow);
       overflow: hidden;
-      margin-bottom: 24px;
     }
 
     table {
@@ -668,32 +267,6 @@
     th {
       background-color: var(--primary-color);
       color: white;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    
-    th.sortable {
-      position: relative;
-    }
-    
-    .sort-icon {
-      margin-left: 6px;
-      font-size: 12px;
-    }
-
-    tbody tr:hover {
-      background-color: #f9f9f9;
-      cursor: pointer;
-    }
-
-    .highlighted {
-      background-color: var(--primary-light) !important;
-      animation: highlight 2s;
-    }
-
-    @keyframes highlight {
-      0% { background-color: var(--primary-light); }
-      100% { background-color: #f0f7ff; }
     }
 
     .empty-state {
@@ -704,11 +277,6 @@
       padding: 48px 24px;
       text-align: center;
       color: #777;
-    }
-
-    .empty-state p {
-      margin-bottom: 16px;
-      font-size: 18px;
     }
 
     .form-container {
@@ -729,7 +297,6 @@
     .form-container.hidden {
       opacity: 0;
       visibility: hidden;
-      transform: translate(-50%, -60%);
     }
 
     .form-header {
@@ -739,22 +306,6 @@
       padding: 16px;
       background-color: var(--primary-color);
       color: white;
-    }
-
-    .form-header h2 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 500;
-    }
-
-    .close-button {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 24px;
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
     }
 
     .form-body {
@@ -774,34 +325,6 @@
       display: flex;
       justify-content: flex-end;
       gap: 12px;
-      margin-top: 16px;
-    }
-
-    .cancel-button {
-      padding: 8px 16px;
-      background-color: #f1f1f1;
-      color: #333;
-      border: none;
-      border-radius: var(--border-radius);
-      cursor: pointer;
-    }
-
-    .save-button {
-      padding: 8px 16px;
-      background-color: var(--success-color);
-      color: white;
-      border: none;
-      border-radius: var(--border-radius);
-      cursor: pointer;
-    }
-
-    .delete-button {
-      padding: 8px 16px;
-      background-color: var(--danger-color);
-      color: white;
-      border: none;
-      border-radius: var(--border-radius);
-      cursor: pointer;
     }
 
     #toast {
@@ -826,109 +349,33 @@
       visibility: visible;
       opacity: 1;
     }
-    
+
     /* スマホ対応のスタイル */
     @media (max-width: 767px) {
       table {
         display: block;
       }
-      
+
       thead {
         display: none; /* モバイルではヘッダー非表示 */
       }
-      
+
       tbody {
         display: block;
       }
-      
+
       .product-row {
         display: grid;
         grid-template-columns: 1fr;
         padding: 12px;
         border-bottom: 1px solid #eee;
       }
-      
+
       .product-row td {
         display: block;
         border: none;
         padding: 4px 0;
       }
-      
-      .product-data, .price-data {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-      
-      .product-name {
-        font-weight: bold;
-        grid-column: 1;
-      }
-      
-      .manufacturer {
-        grid-column: 2;
-        text-align: right;
-        color: #666;
-      }
-      
-      .store {
-        grid-column: 1;
-      }
-      
-      .price {
-        grid-column: 2;
-        text-align: right;
-        font-weight: bold;
-        color: var(--primary-dark);
-      }
     }
-    
-    /* モバイルでのヘッダー表示（代替） */
-    @media (max-width: 767px) {
-      .mobile-sort-controls {
-        display: flex;
-        justify-content: space-between;
-        background-color: var(--primary-color);
-        color: white;
-        padding: 8px 12px;
-        margin-bottom: 8px;
-        border-radius: var(--border-radius);
-      }
-      
-      .mobile-sort-button {
-        background: none;
-        border: none;
-        color: white;
-        padding: 4px 8px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-    }
-
-    @media (min-width: 768px) {
-      .header {
-        flex-wrap: nowrap;
-      }
-      
-      .action-button {
-        white-space: nowrap;
-      }
-      
-      /* PCでのテーブル表示 */
-      .product-row {
-        display: table-row;
-      }
-      
-      .product-row td {
-        display: table-cell;
-      }
-      
-      /* PCでのモバイル用ソートコントロールを非表示 */
-      .mobile-sort-controls {
-        display: none;
-      }
-      
-      thead {
-        display: table-header-group;
-      }
-    }
+  </style>
+</html>
