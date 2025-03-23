@@ -12,7 +12,6 @@
     <div class="header">
       <div class="search-container">
         <input type="text" id="searchInput" placeholder="商品名で検索..." />
-        <div id="searchResults" class="search-results"></div>
       </div>
       <button id="addNewBtn" class="action-button">+ 新規追加</button>
     </div>
@@ -32,6 +31,10 @@
       <div id="emptyState" class="empty-state">
         <p>データがありません</p>
         <button class="action-button" onclick="toggleAddForm(true)">商品を追加する</button>
+      </div>
+      <div id="noResults" class="empty-state" style="display: none;">
+        <p>検索結果がありません</p>
+        <button class="action-button" onclick="clearSearch()">検索をクリア</button>
       </div>
     </div>
 
@@ -75,8 +78,10 @@
 
     <script>
       let products = [];
+      let filteredProducts = [];
       let currentRequest = null;
       let retryCount = 0;
+      let isFiltering = false;
       const maxRetries = 3;
       let currentEditIndex = null;
 
@@ -85,15 +90,7 @@
 
       // イベントリスナー設定
       document.getElementById("addNewBtn").addEventListener("click", () => toggleAddForm(true));
-      document.getElementById("searchInput").addEventListener("input", handleSearch);
-      document.addEventListener("click", function(event) {
-        const searchInput = document.getElementById("searchInput");
-        const searchResults = document.getElementById("searchResults");
-        
-        if (event.target !== searchInput && !searchResults.contains(event.target)) {
-          searchResults.style.display = "none";
-        }
-      });
+      document.getElementById("searchInput").addEventListener("input", filterTable);
 
       // キーボードショートカット
       document.addEventListener("keydown", function(e) {
@@ -137,15 +134,18 @@
           
           try {
             products = JSON.parse(text);
+            filteredProducts = [...products];
             console.log('データの読み込みに成功しました:', products.length, '件');
           } catch (parseError) {
             console.error('JSONの解析エラー:', parseError);
             products = [];
+            filteredProducts = [];
             showToast("データファイルの形式が無効です。新規に作成します。");
           }
         } catch (error) {
           console.error('データ読み込みエラー:', error);
           products = [];
+          filteredProducts = [];
           showToast("データの読み込みに失敗しました。新規に作成します。");
         } finally {
           updateTable();
@@ -164,17 +164,30 @@
       function updateTable() {
         const tbody = document.getElementById("productTable");
         const emptyState = document.getElementById("emptyState");
+        const noResults = document.getElementById("noResults");
         
         tbody.innerHTML = "";
 
-        if (products.length === 0) {
-          emptyState.style.display = "flex";
+        // 表示するデータがない場合
+        if (filteredProducts.length === 0) {
+          if (isFiltering) {
+            // 検索結果がない場合
+            emptyState.style.display = "none";
+            noResults.style.display = "flex";
+          } else if (products.length === 0) {
+            // データ自体がない場合
+            emptyState.style.display = "flex";
+            noResults.style.display = "none";
+          }
           return;
         }
         
+        // データがある場合は両方の空の状態を非表示
         emptyState.style.display = "none";
+        noResults.style.display = "none";
 
-        products
+        // テーブルを更新
+        filteredProducts
           .sort((a, b) => a.productName.localeCompare(b.productName, 'ja'))
           .forEach((product, index) => {
             const row = tbody.insertRow();
@@ -182,8 +195,52 @@
             row.insertCell().textContent = product.manufacturer;
             row.insertCell().textContent = product.store;
             row.insertCell().textContent = formatPrice(product.price);
-            row.onclick = () => openEditForm(index);
+            
+            // クリック時の処理
+            row.onclick = () => {
+              // フィルタリング時は、元の配列でのインデックスを見つける
+              if (isFiltering) {
+                const originalIndex = products.findIndex(p => 
+                  p.productName === product.productName && 
+                  p.manufacturer === product.manufacturer &&
+                  p.store === product.store &&
+                  p.price === product.price
+                );
+                openEditForm(originalIndex);
+              } else {
+                openEditForm(index);
+              }
+            };
           });
+      }
+
+      // テーブルをフィルタリング
+      function filterTable() {
+        const searchTerm = document.getElementById("searchInput").value.toLowerCase().trim();
+        
+        if (searchTerm.length === 0) {
+          // 検索語がなければフィルタリングをクリア
+          clearSearch();
+          return;
+        }
+        
+        isFiltering = true;
+        
+        // 商品名またはメーカーで検索
+        filteredProducts = products.filter(product => 
+          product.productName.toLowerCase().includes(searchTerm) || 
+          product.manufacturer.toLowerCase().includes(searchTerm)
+        );
+        
+        updateTable();
+      }
+
+      // 検索をクリア
+      function clearSearch() {
+        document.getElementById("searchInput").value = "";
+        isFiltering = false;
+        filteredProducts = [...products];
+        updateTable();
       }
 
       // GitHub 関連機能
@@ -299,7 +356,10 @@
         if (productName && manufacturer && store && !isNaN(parseFloat(price))) {
           price = parseFloat(price);
           products.push({ productName, manufacturer, store, price });
-          updateTable();
+          
+          // フィルタリングをリセット
+          clearSearch();
+          
           toggleAddForm(false);
           
           autoSave(products).then(success => {
@@ -324,7 +384,15 @@
         if (productName && manufacturer && store && !isNaN(parseFloat(price))) {
           price = parseFloat(price);
           products[currentEditIndex] = { productName, manufacturer, store, price };
-          updateTable();
+          
+          // 検索中の場合は、フィルタリングを適用し直す
+          if (isFiltering) {
+            filterTable();
+          } else {
+            filteredProducts = [...products];
+            updateTable();
+          }
+          
           toggleEditForm(false);
           
           autoSave(products).then(success => {
@@ -343,7 +411,15 @@
       function deleteProduct() {
         if (confirm("本当にこの商品を削除しますか？")) {
           products.splice(currentEditIndex, 1);
-          updateTable();
+          
+          // 検索中の場合は、フィルタリングを適用し直す
+          if (isFiltering) {
+            filterTable();
+          } else {
+            filteredProducts = [...products];
+            updateTable();
+          }
+          
           toggleEditForm(false);
           
           autoSave(products).then(success => {
@@ -353,78 +429,6 @@
               showToast("削除に失敗しました");
             }
           });
-        }
-      }
-
-      // 検索機能
-      function handleSearch() {
-        const searchTerm = this.value.toLowerCase().trim();
-        const resultsContainer = document.getElementById("searchResults");
-        
-        resultsContainer.innerHTML = "";
-        
-        if (searchTerm.length < 2) {
-          resultsContainer.style.display = "none";
-          return;
-        }
-        
-        // 商品名で検索
-        const matches = products.filter(product => 
-          product.productName.toLowerCase().includes(searchTerm)
-        );
-        
-        if (matches.length > 0) {
-          resultsContainer.style.display = "block";
-          
-          // 最大10件まで表示
-          matches.slice(0, 10).forEach(product => {
-            const resultItem = document.createElement("div");
-            resultItem.className = "result-item";
-            resultItem.textContent = `${product.productName} (${product.manufacturer}) - ${formatPrice(product.price)}`;
-            
-            resultItem.addEventListener("click", function() {
-              document.getElementById("searchInput").value = product.productName;
-              resultsContainer.style.display = "none";
-              
-              // 該当商品をハイライトして表示位置へスクロール
-              const index = products.findIndex(p => 
-                p.productName === product.productName && 
-                p.manufacturer === product.manufacturer &&
-                p.store === product.store
-              );
-              
-              if (index !== -1) {
-                const rows = document.getElementById("productTable").rows;
-                
-                // 以前のハイライトを解除
-                Array.from(rows).forEach(row => {
-                  row.classList.remove("highlighted");
-                });
-                
-                // 該当行をハイライト
-                if (rows[index]) {
-                  rows[index].classList.add("highlighted");
-                  // スクロール
-                  rows[index].scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-              }
-            });
-            
-            resultsContainer.appendChild(resultItem);
-          });
-          
-          if (matches.length > 10) {
-            const moreResults = document.createElement("div");
-            moreResults.className = "more-results";
-            moreResults.textContent = `他 ${matches.length - 10} 件の結果があります`;
-            resultsContainer.appendChild(moreResults);
-          }
-        } else {
-          resultsContainer.style.display = "block";
-          const noResults = document.createElement("div");
-          noResults.className = "no-results";
-          noResults.textContent = "該当する商品がありません";
-          resultsContainer.appendChild(noResults);
         }
       }
 
@@ -550,36 +554,6 @@
       border: 1px solid #ddd;
       border-radius: var(--border-radius);
       font-size: 16px;
-    }
-
-    .search-results {
-      display: none;
-      position: absolute;
-      width: 100%;
-      max-height: 300px;
-      overflow-y: auto;
-      background-color: var(--card-color);
-      border: 1px solid #ddd;
-      border-radius: var(--border-radius);
-      box-shadow: var(--shadow);
-      z-index: 10;
-    }
-
-    .result-item {
-      padding: 8px 12px;
-      border-bottom: 1px solid #eee;
-      cursor: pointer;
-    }
-
-    .result-item:hover {
-      background-color: var(--primary-light);
-    }
-
-    .no-results, .more-results {
-      padding: 8px 12px;
-      color: #777;
-      font-style: italic;
-      text-align: center;
     }
 
     .action-button {
