@@ -20,10 +20,10 @@
       <table>
         <thead>
           <tr>
-            <th>商品名</th>
-            <th>メーカー</th>
-            <th>店</th>
-            <th>価格</th>
+            <th class="sortable" data-sort="productName">商品名 <span class="sort-icon"></span></th>
+            <th class="sortable" data-sort="manufacturer">メーカー <span class="sort-icon"></span></th>
+            <th class="sortable" data-sort="store">店 <span class="sort-icon"></span></th>
+            <th class="sortable" data-sort="price">価格 <span class="sort-icon"></span></th>
           </tr>
         </thead>
         <tbody id="productTable"></tbody>
@@ -84,6 +84,10 @@
       let isFiltering = false;
       const maxRetries = 3;
       let currentEditIndex = null;
+      
+      // ソート関連の変数
+      let currentSortColumn = 'productName'; // デフォルトは商品名でソート
+      let currentSortDirection = 'asc'; // デフォルトは昇順
 
       // 起動時にデータを読み込む
       loadProducts();
@@ -91,6 +95,33 @@
       // イベントリスナー設定
       document.getElementById("addNewBtn").addEventListener("click", () => toggleAddForm(true));
       document.getElementById("searchInput").addEventListener("input", filterTable);
+      
+      // ソート用のイベントリスナーをヘッダーに追加
+      document.querySelectorAll('th.sortable').forEach(header => {
+        header.addEventListener('click', () => {
+          const sortColumn = header.getAttribute('data-sort');
+          
+          // 同じカラムをクリックした場合はソート方向を変更
+          if (sortColumn === currentSortColumn) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            currentSortColumn = sortColumn;
+            currentSortDirection = 'asc';
+          }
+          
+          // ソートアイコンをリセット
+          document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.textContent = '';
+          });
+          
+          // クリックされたヘッダーにソートアイコンを設定
+          const sortIcon = header.querySelector('.sort-icon');
+          sortIcon.textContent = currentSortDirection === 'asc' ? '▲' : '▼';
+          
+          // テーブルを再描画
+          updateTable();
+        });
+      });
 
       // キーボードショートカット
       document.addEventListener("keydown", function(e) {
@@ -185,33 +216,77 @@
         // データがある場合は両方の空の状態を非表示
         emptyState.style.display = "none";
         noResults.style.display = "none";
+        
+        // カラムのデータ型に応じてソート関数を選択
+        const sortedProducts = [...filteredProducts].sort((a, b) => {
+          let valueA, valueB;
+          
+          // 価格は数値としてソート、それ以外は文字列として比較
+          if (currentSortColumn === 'price') {
+            valueA = a[currentSortColumn];
+            valueB = b[currentSortColumn];
+          } else {
+            valueA = a[currentSortColumn].toLowerCase();
+            valueB = b[currentSortColumn].toLowerCase();
+          }
+          
+          // 文字列比較の場合は日本語対応の比較を使用
+          if (typeof valueA === 'string') {
+            return currentSortDirection === 'asc' 
+              ? valueA.localeCompare(valueB, 'ja') 
+              : valueB.localeCompare(valueA, 'ja');
+          }
+          
+          // 数値比較
+          return currentSortDirection === 'asc' 
+            ? valueA - valueB 
+            : valueB - valueA;
+        });
 
         // テーブルを更新
-        filteredProducts
-          .sort((a, b) => a.productName.localeCompare(b.productName, 'ja'))
-          .forEach((product, index) => {
-            const row = tbody.insertRow();
-            row.insertCell().textContent = product.productName;
-            row.insertCell().textContent = product.manufacturer;
-            row.insertCell().textContent = product.store;
-            row.insertCell().textContent = formatPrice(product.price);
-            
-            // クリック時の処理
-            row.onclick = () => {
-              // フィルタリング時は、元の配列でのインデックスを見つける
-              if (isFiltering) {
-                const originalIndex = products.findIndex(p => 
-                  p.productName === product.productName && 
-                  p.manufacturer === product.manufacturer &&
-                  p.store === product.store &&
-                  p.price === product.price
-                );
-                openEditForm(originalIndex);
-              } else {
-                openEditForm(index);
-              }
-            };
-          });
+        sortedProducts.forEach((product, index) => {
+          const row = tbody.insertRow();
+          row.className = 'product-row';
+          
+          // スマホ用レイアウト対応
+          // 1. 商品名とメーカーを1行目に
+          const firstRow = row.insertCell();
+          firstRow.className = 'product-data';
+          firstRow.innerHTML = `
+            <div class="product-name">${product.productName}</div>
+            <div class="manufacturer">${product.manufacturer}</div>
+          `;
+          
+          // 2. 店と価格を2行目に
+          const secondRow = row.insertCell();
+          secondRow.className = 'price-data';
+          secondRow.innerHTML = `
+            <div class="store">${product.store}</div>
+            <div class="price">${formatPrice(product.price)}</div>
+          `;
+          
+          // 行全体をクリック可能に
+          row.onclick = () => {
+            // フィルタリング時は、元の配列でのインデックスを見つける
+            if (isFiltering) {
+              const originalIndex = products.findIndex(p => 
+                p.productName === product.productName && 
+                p.manufacturer === product.manufacturer &&
+                p.store === product.store &&
+                p.price === product.price
+              );
+              openEditForm(originalIndex);
+            } else {
+              const originalIndex = products.findIndex(p => 
+                p.productName === product.productName && 
+                p.manufacturer === product.manufacturer &&
+                p.store === product.store &&
+                p.price === product.price
+              );
+              openEditForm(originalIndex);
+            }
+          };
+        });
       }
 
       // テーブルをフィルタリング
@@ -594,6 +669,16 @@
       background-color: var(--primary-color);
       color: white;
       font-weight: 500;
+      cursor: pointer;
+    }
+    
+    th.sortable {
+      position: relative;
+    }
+    
+    .sort-icon {
+      margin-left: 6px;
+      font-size: 12px;
     }
 
     tbody tr:hover {
@@ -741,6 +826,84 @@
       visibility: visible;
       opacity: 1;
     }
+    
+    /* スマホ対応のスタイル */
+    @media (max-width: 767px) {
+      table {
+        display: block;
+      }
+      
+      thead {
+        display: none; /* モバイルではヘッダー非表示 */
+      }
+      
+      tbody {
+        display: block;
+      }
+      
+      .product-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .product-row td {
+        display: block;
+        border: none;
+        padding: 4px 0;
+      }
+      
+      .product-data, .price-data {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      
+      .product-name {
+        font-weight: bold;
+        grid-column: 1;
+      }
+      
+      .manufacturer {
+        grid-column: 2;
+        text-align: right;
+        color: #666;
+      }
+      
+      .store {
+        grid-column: 1;
+      }
+      
+      .price {
+        grid-column: 2;
+        text-align: right;
+        font-weight: bold;
+        color: var(--primary-dark);
+      }
+    }
+    
+    /* モバイルでのヘッダー表示（代替） */
+    @media (max-width: 767px) {
+      .mobile-sort-controls {
+        display: flex;
+        justify-content: space-between;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-radius: var(--border-radius);
+      }
+      
+      .mobile-sort-button {
+        background: none;
+        border: none;
+        color: white;
+        padding: 4px 8px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+    }
 
     @media (min-width: 768px) {
       .header {
@@ -750,6 +913,22 @@
       .action-button {
         white-space: nowrap;
       }
+      
+      /* PCでのテーブル表示 */
+      .product-row {
+        display: table-row;
+      }
+      
+      .product-row td {
+        display: table-cell;
+      }
+      
+      /* PCでのモバイル用ソートコントロールを非表示 */
+      .mobile-sort-controls {
+        display: none;
+      }
+      
+      thead {
+        display: table-header-group;
+      }
     }
-  </style>
-</html>
