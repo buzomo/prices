@@ -185,6 +185,13 @@
             }
         }
 
+        // ひらがな→カタカナ変換
+        function hiraToKana(str) {
+            return str.replace(/[\u3041-\u3096]/g, function(ch) {
+                return String.fromCharCode(ch.charCodeAt(0) + 0x60);
+            });
+        }
+
         // 価格フォーマット
         function formatPrice(price) {
             return new Intl.NumberFormat("ja-JP", {
@@ -217,6 +224,9 @@
                 return;
             }
             // --- ここまで追加 ---
+
+            // 価格で昇順ソート
+            filteredProducts.sort((a, b) => a.price - b.price);
 
             productList.innerHTML = "";
 
@@ -268,7 +278,9 @@
 
         // テーブルをフィルタリング
         function filterTable() {
-            const searchTerm = document.getElementById("searchInput").value.toLowerCase().trim();
+            const searchTermRaw = document.getElementById("searchInput").value.trim();
+            const searchTerm = searchTermRaw.toLowerCase();
+            const searchTermKana = hiraToKana(searchTerm);
 
             if (searchTerm.length === 0) {
                 // 検索語がなければフィルタリングをクリア
@@ -278,14 +290,29 @@
 
             isFiltering = true;
 
-            // 商品名・メーカー・店・価格で検索
-            filteredProducts = products.filter(product =>
-                product.productName.toLowerCase().includes(searchTerm) ||
-                product.manufacturer.toLowerCase().includes(searchTerm) ||
-                product.store.toLowerCase().includes(searchTerm) ||
-                String(product.price).includes(searchTerm) ||
-                formatPrice(product.price).toLowerCase().includes(searchTerm)
-            );
+            // 商品名・メーカー・店・価格で検索（ひらがな→カタカナも対応）
+            filteredProducts = products.filter(product => {
+                // すべて小文字化
+                const productName = product.productName.toLowerCase();
+                const productNameKana = hiraToKana(productName);
+                const manufacturer = product.manufacturer.toLowerCase();
+                const manufacturerKana = hiraToKana(manufacturer);
+                const store = product.store.toLowerCase();
+                const storeKana = hiraToKana(store);
+                const priceStr = String(product.price);
+                const priceFormatted = formatPrice(product.price).toLowerCase();
+
+                return (
+                    productName.includes(searchTerm) ||
+                    productNameKana.includes(searchTermKana) ||
+                    manufacturer.includes(searchTerm) ||
+                    manufacturerKana.includes(searchTermKana) ||
+                    store.includes(searchTerm) ||
+                    storeKana.includes(searchTermKana) ||
+                    priceStr.includes(searchTerm) ||
+                    priceFormatted.includes(searchTerm)
+                );
+            });
 
             updateTable();
         }
@@ -619,8 +646,22 @@
                     return;
                 }
 
-                // 上書き
-                products = newProducts;
+                // 既存データと重複しないものだけ追加
+                let beforeCount = products.length;
+                let merged = [...products];
+                for (const np of newProducts) {
+                    // 重複判定: 商品名・メーカー・店・価格がすべて一致
+                    const exists = merged.some(p =>
+                        p.productName === np.productName &&
+                        p.manufacturer === np.manufacturer &&
+                        p.store === np.store &&
+                        p.price === np.price
+                    );
+                    if (!exists) {
+                        merged.push(np);
+                    }
+                }
+                products = merged;
                 filteredProducts = [...products];
                 isFiltering = false;
                 updateTable();
