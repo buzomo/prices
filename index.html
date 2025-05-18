@@ -9,7 +9,6 @@
 </head>
 
 <body>
-    <a href="https://github.com/buzomo/prices/edit/main/index.html"style="text-decoration:none;position:fixed;right:13px;bottom:0;color:orange">edit now</a>
     <div class="header">
         <div class="search-container">
             <input type="text" id="searchInput" placeholder="商品名・メーカー・店・価格で検索..." />
@@ -69,6 +68,12 @@
                 </div>
             </div>
         </div>
+    </div>
+    <div id="emoji-dock">
+        <a href="https://呼吸.へ.pw/" title="tan">😲</a>
+        <a href="https://記録.へ.pw/" title="統合">🌈 </a>
+        <a href="https://金.へ.pw/" title="金">👛</a>
+        <a href="https://クレカ.へ.pw/" title="クレカ">💳</a>
     </div>
 
     <div id="toast"></div>
@@ -187,7 +192,7 @@
 
         // ひらがな→カタカナ変換
         function hiraToKana(str) {
-            return str.replace(/[\u3041-\u3096]/g, function(ch) {
+            return str.replace(/[\u3041-\u3096]/g, function (ch) {
                 return String.fromCharCode(ch.charCodeAt(0) + 0x60);
             });
         }
@@ -681,6 +686,38 @@
     </script>
 </body>
 <style>
+    #emoji-dock {
+        position: fixed;
+        left: 50%;
+        bottom: 32px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 24px;
+        background: rgba(16, 185, 129, 0.185);
+        /* エメラルドカラー */
+        border-radius: 20px;
+        backdrop-filter: blur(12px);
+        /* 背景をぼかす */
+        box-shadow: 2px 10px 16px rgba(181, 204, 200, 0.8);
+        padding: 8px 22px;
+        z-index: 9998;
+        height: 54px;
+        align-items: center;
+    }
+
+    #emoji-dock a {
+        font-size: 1.9rem;
+        text-decoration: none;
+        transition: transform 0.15s, filter 0.15s;
+        filter: grayscale(0.2);
+        user-select: none;
+    }
+
+    #emoji-dock a:hover {
+        transform: scale(1.25) translateY(-8px);
+        filter: grayscale(0) drop-shadow(0 2px 8px #4e6cf2aa);
+    }
+
     :root {
         --primary-color: #2196F3;
         --primary-dark: #1976D2;
@@ -723,6 +760,7 @@
         position: relative;
         flex-grow: 1;
     }
+
     #searchInput {
         width: 100%;
         padding: 0 12px;
